@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:video_list_test_code_ninja/ui/home.dart';
+import 'package:provider/provider.dart';
+import 'package:video_list_test_code_ninja/provider/provider_setup.dart';
+import 'package:video_list_test_code_ninja/ui/home_screen.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(
+
+    (MultiProvider(
+      providers: ProviderSetup.providers,
+      child: MyApp(),
+    )));
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
@@ -25,5 +32,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-
