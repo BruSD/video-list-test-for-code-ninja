@@ -8,6 +8,7 @@ class VideoProvider with ChangeNotifier {
   List<VideoCN> _videoList = [];
   bool _isLoaded = false;
   bool _isUploadingVideo = false;
+  VideoCN _selectedVideoToPlay;
 
   get videoList => _videoList;
 
@@ -15,17 +16,27 @@ class VideoProvider with ChangeNotifier {
 
   get isUploadingVideo => _isUploadingVideo;
 
-  initProvider() {}
+  initProvider() async {
+    _isLoaded = false;
+    _videoList = await _videoRepository.getVideoList();
+    _isLoaded = true;
+    notifyListeners();
+  }
 
   Future<VideoCN> uploadVideo(String videoPath) async {
     _isUploadingVideo = true;
     notifyListeners();
 
     VideoCN videoCN = await _videoRepository.uploadVideo(videoPath);
-
+    _videoList.add(videoCN);
+    _isLoaded = true;
     _isUploadingVideo = false;
     notifyListeners();
 
     return videoCN;
+  }
+
+  selectVideoToPlay(int index) {
+    _selectedVideoToPlay = _videoList[index];
   }
 }
