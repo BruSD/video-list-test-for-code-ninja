@@ -10,6 +10,8 @@ class VideoProvider with ChangeNotifier {
   bool _isUploadingVideo = false;
   VideoCN _selectedVideoToPlay;
 
+  get selectedVideoToPlay => _selectedVideoToPlay;
+
   get videoList => _videoList;
 
   get isLoadedList => _isLoaded;

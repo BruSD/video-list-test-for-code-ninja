@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:video_list_test_code_ninja/provider/video-provider.dart';
+import 'package:video_list_test_code_ninja/utils/VideoControls.dart';
 import 'package:video_player/video_player.dart';
 
 class PlayVideoScreen extends StatefulWidget {
@@ -12,9 +15,10 @@ class _PlayVideoScreenState extends State<PlayVideoScreen> {
   @override
   void initState() {
     super.initState();
+    final videoProvider = Provider.of<VideoProvider>(context, listen: false);
 
     _controller = VideoPlayerController.network(
-        'https://www.sample-videos.com/video123/mp4/720/big_buck_bunny_720p_20mb.mp4')
+        videoProvider.selectedVideoToPlay.videoURL)
       ..initialize().then((_) {
         // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
         setState(() {});
@@ -26,28 +30,35 @@ class _PlayVideoScreenState extends State<PlayVideoScreen> {
     return MaterialApp(
       title: 'Video Demo',
       home: Scaffold(
+        appBar: AppBar(
+          title: Text('Video View'),
+
+        ),
         body: Center(
           child: _controller.value.initialized
-              ? AspectRatio(
-                  aspectRatio: _controller.value.aspectRatio,
-                  child: VideoPlayer(_controller),
-                )
+              ? _renderPlayer(context)
               : CircularProgressIndicator(),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            if (_controller.value.initialized)
-              setState(() {
-                _controller.value.isPlaying
-                    ? _controller.pause()
-                    : _controller.play();
-              });
-          },
-          child: Icon(
-            _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+      ),
+    );
+  }
+
+  Widget _renderPlayer(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        AspectRatio(
+          aspectRatio: _controller.value.aspectRatio,
+          child: VideoPlayer(_controller),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: VideoControls(
+            videoController: _controller,
           ),
         ),
-      ),
+      ],
     );
   }
 
