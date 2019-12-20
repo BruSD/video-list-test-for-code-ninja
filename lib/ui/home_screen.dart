@@ -36,10 +36,39 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Widget _build(BuildContext context) {
     final videoProvider = Provider.of<VideoProvider>(context);
-    if (videoProvider.isLoaded) {
-      return Container();
-    } else {
-      return Center(child: CircularProgressIndicator());
-    }
+    return Container(
+      child: Column(
+        children: <Widget>[
+          _buildVideoUploadingToServer(context),
+          videoProvider.isLoadedList == false
+              ? _loading(context)
+              : _buildList(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _loading(BuildContext context) {
+    return Center(child: CircularProgressIndicator());
+  }
+
+  Widget _buildList(BuildContext context) {
+    return Container();
+  }
+
+  Widget _buildVideoUploadingToServer(BuildContext context) {
+    final videoProvider = Provider.of<VideoProvider>(context);
+    return SizedBox(
+      height: videoProvider.isUploadingVideo ? 50 : 0,
+      child: videoProvider.isUploadingVideo
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                Text('Video Uploading to server'),
+                CircularProgressIndicator()
+              ],
+            )
+          : Container(),
+    );
   }
 }

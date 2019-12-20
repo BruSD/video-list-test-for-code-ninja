@@ -3,9 +3,13 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter/services.dart';
+
+import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'package:video_player/video_player.dart';
+import 'package:thumbnails/thumbnails.dart';
+import 'package:video_list_test_code_ninja/utils/Gallery.dart';
+import 'package:video_list_test_code_ninja/utils/VideoTimer.dart';
 
 class TakeVideoScreen extends StatefulWidget {
   TakeVideoScreen({Key key, this.title}) : super(key: key);
@@ -15,203 +19,214 @@ class TakeVideoScreen extends StatefulWidget {
   _TakeVideoScreenState createState() => _TakeVideoScreenState();
 }
 
-class _TakeVideoScreenState extends State<TakeVideoScreen> {
-
-  CameraController controller;
-  String videoPath;
-
-  List<CameraDescription> cameras;
-  int selectedCameraIdx;
-
+class _TakeVideoScreenState extends State<TakeVideoScreen>
+    with AutomaticKeepAliveClientMixin {
+  CameraController _controller;
+  List<CameraDescription> _cameras;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isRecordingMode = true;
+  bool _isRecording = false;
+  final _timerKey = GlobalKey<VideoTimerState>();
 
   @override
   void initState() {
+    _initCamera();
     super.initState();
+  }
 
-    // Get the listonNewCameraSelected of available cameras.
-    // Then set the first camera as selected.
-    availableCameras()
-        .then((availableCameras) {
-      cameras = availableCameras;
-
-      if (cameras.length > 0) {
-        setState(() {
-          selectedCameraIdx = 0;
-        });
-
-        _onCameraSwitched(cameras[selectedCameraIdx]).then((void v) {});
+  Future<void> _initCamera() async {
+    _cameras = await availableCameras();
+    _controller = CameraController(_cameras[0], ResolutionPreset.medium);
+    _controller.initialize().then((_) {
+      if (!mounted) {
+        return;
       }
-    })
-        .catchError((err) {
-      print('Error: $err.code\nError Message: $err.message');
+      setState(() {});
     });
   }
 
   @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
+    if (_controller != null) {
+      if (!_controller.value.isInitialized) {
+        return Container();
+      }
+    } else {
+      return const Center(
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (!_controller.value.isInitialized) {
+      return Container();
+    }
     return Scaffold(
+      backgroundColor: Theme.of(context).backgroundColor,
       key: _scaffoldKey,
-      appBar: AppBar(
-        title: const Text('Camera example'),
-      ),
-      body: Column(
+      extendBody: true,
+      body: Stack(
         children: <Widget>[
-          Expanded(
-            child: Container(
-              child: Padding(
-                padding: const EdgeInsets.all(1.0),
-                child: Center(
-                  child: _cameraPreviewWidget(),
-                ),
+          _buildCameraPreview(),
+          Positioned(
+            top: 24.0,
+            left: 12.0,
+            child: IconButton(
+              icon: Icon(
+                Icons.switch_camera,
+                color: Colors.white,
               ),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                border: Border.all(
-                  color: controller != null && controller.value.isRecordingVideo
-                      ? Colors.redAccent
-                      : Colors.grey,
-                  width: 3.0,
-                ),
-              ),
+              onPressed: () {
+                _onCameraSwitch();
+              },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(5.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: <Widget>[
-                _cameraTogglesRowWidget(),
-                _captureControlRowWidget(),
-                Expanded(
-                  child: SizedBox(),
-                ),
-              ],
+          if (_isRecordingMode)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 32.0,
+              child: VideoTimer(
+                key: _timerKey,
+              ),
+            )
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildCameraPreview() {
+    final size = MediaQuery.of(context).size;
+    return ClipRect(
+      child: Container(
+        child: Transform.scale(
+          scale: _controller.value.aspectRatio / size.aspectRatio,
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: _controller.value.aspectRatio,
+              child: CameraPreview(_controller),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      color: Theme.of(context).bottomAppBarColor,
+      height: 100.0,
+      width: double.infinity,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: <Widget>[
+          FutureBuilder(
+            future: getLastImage(),
+            builder: (context, snapshot) {
+              if (snapshot.data == null) {
+                return Container(
+                  width: 40.0,
+                  height: 40.0,
+                );
+              }
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => Gallery(),
+                  ),
+                ),
+                child: Container(
+                  width: 40.0,
+                  height: 40.0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4.0),
+                    child: Image.file(
+                      snapshot.data,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          CircleAvatar(
+            backgroundColor: Colors.white,
+            radius: 28.0,
+            child: IconButton(
+              icon: Icon(
+                (_isRecordingMode)
+                    ? (_isRecording) ? Icons.stop : Icons.videocam
+                    : Icons.camera_alt,
+                size: 28.0,
+                color: (_isRecording) ? Colors.red : Colors.black,
+              ),
+              onPressed: () {
+                if (!_isRecordingMode) {
+                  _captureImage();
+                } else {
+                  if (_isRecording) {
+                    stopVideoRecording();
+                  } else {
+                    startVideoRecording();
+                  }
+                }
+              },
+            ),
+          ),
+
         ],
       ),
     );
   }
 
-  IconData _getCameraLensIcon(CameraLensDirection direction) {
-    switch (direction) {
-      case CameraLensDirection.back:
-        return Icons.camera_rear;
-      case CameraLensDirection.front:
-        return Icons.camera_front;
-      case CameraLensDirection.external:
-        return Icons.camera;
-      default:
-        return Icons.device_unknown;
+  Future<FileSystemEntity> getLastImage() async {
+    final Directory extDir = await getApplicationDocumentsDirectory();
+    final String dirPath = '${extDir.path}/media';
+    final myDir = Directory(dirPath);
+    List<FileSystemEntity> _images;
+    _images = myDir.listSync(recursive: true, followLinks: false);
+    _images.sort((a, b) {
+      return b.path.compareTo(a.path);
+    });
+    var lastFile = _images[0];
+    var extension = path.extension(lastFile.path);
+    if (extension == '.jpeg') {
+      return lastFile;
+    } else {
+      String thumb = await Thumbnails.getThumbnail(
+          videoFile: lastFile.path, imageType: ThumbFormat.PNG, quality: 30);
+      return File(thumb);
     }
   }
 
-  // Display 'Loading' text when the camera is still loading.
-  Widget _cameraPreviewWidget() {
-    if (controller == null || !controller.value.isInitialized) {
-      return const Text(
-        'Loading',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 20.0,
-          fontWeight: FontWeight.w900,
-        ),
-      );
+  Future<void> _onCameraSwitch() async {
+    final CameraDescription cameraDescription =
+        (_controller.description == _cameras[0]) ? _cameras[1] : _cameras[0];
+    if (_controller != null) {
+      await _controller.dispose();
     }
-
-    return AspectRatio(
-      aspectRatio: controller.value.aspectRatio,
-      child: CameraPreview(controller),
-    );
-  }
-
-  /// Display a row of toggle to select the camera (or a message if no camera is available).
-  Widget _cameraTogglesRowWidget() {
-    if (cameras == null) {
-      return Row();
-    }
-
-    CameraDescription selectedCamera = cameras[selectedCameraIdx];
-    CameraLensDirection lensDirection = selectedCamera.lensDirection;
-
-    return Expanded(
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: FlatButton.icon(
-            onPressed: _onSwitchCamera,
-            icon: Icon(
-                _getCameraLensIcon(lensDirection)
-            ),
-            label: Text("${lensDirection.toString()
-                .substring(lensDirection.toString().indexOf('.')+1)}")
-        ),
-      ),
-    );
-  }
-
-  /// Display the control bar with buttons to record videos.
-  Widget _captureControlRowWidget() {
-    return Expanded(
-      child: Align(
-        alignment: Alignment.center,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          mainAxisSize: MainAxisSize.max,
-          children: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.videocam),
-              color: Colors.blue,
-              onPressed: controller != null &&
-                  controller.value.isInitialized &&
-                  !controller.value.isRecordingVideo
-                  ? _onRecordButtonPressed
-                  : null,
-            ),
-            IconButton(
-              icon: const Icon(Icons.stop),
-              color: Colors.red,
-              onPressed: controller != null &&
-                  controller.value.isInitialized &&
-                  controller.value.isRecordingVideo
-                  ? _onStopButtonPressed
-                  : null,
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
-
-  Future<void> _onCameraSwitched(CameraDescription cameraDescription) async {
-    if (controller != null) {
-      await controller.dispose();
-    }
-
-    controller = CameraController(cameraDescription, ResolutionPreset.high);
-
-    // If the controller is updated then update the UI.
-    controller.addListener(() {
-      if (mounted) {
-        setState(() {});
-      }
-
-      if (controller.value.hasError) {
-        Fluttertoast.showToast(
-            msg: 'Camera error ${controller.value.errorDescription}',
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.CENTER,
-            timeInSecForIos: 1,
-            backgroundColor: Colors.red,
-            textColor: Colors.white
-        );
+    _controller = CameraController(cameraDescription, ResolutionPreset.medium);
+    _controller.addListener(() {
+      if (mounted) setState(() {});
+      if (_controller.value.hasError) {
+        showInSnackBar('Camera error ${_controller.value.errorDescription}');
       }
     });
 
     try {
-      await controller.initialize();
+      await _controller.initialize();
     } on CameraException catch (e) {
       _showCameraException(e);
     }
@@ -221,109 +236,81 @@ class _TakeVideoScreenState extends State<TakeVideoScreen> {
     }
   }
 
-  void _onSwitchCamera() {
-    selectedCameraIdx = selectedCameraIdx < cameras.length - 1
-        ? selectedCameraIdx + 1
-        : 0;
-    CameraDescription selectedCamera = cameras[selectedCameraIdx];
+  void _captureImage() async {
+    print('_captureImage');
+    if (_controller.value.isInitialized) {
+      SystemSound.play(SystemSoundType.click);
+      final Directory extDir = await getApplicationDocumentsDirectory();
+      final String dirPath = '${extDir.path}/media';
+      await Directory(dirPath).create(recursive: true);
+      final String filePath = '$dirPath/${_timestamp()}.jpeg';
+      print('path: $filePath');
+      await _controller.takePicture(filePath);
+      setState(() {});
+    }
+  }
 
-    _onCameraSwitched(selectedCamera);
-
+  Future<String> startVideoRecording() async {
+    print('startVideoRecording');
+    if (!_controller.value.isInitialized) {
+      return null;
+    }
     setState(() {
-      selectedCameraIdx = selectedCameraIdx;
+      _isRecording = true;
     });
-  }
+    _timerKey.currentState.startTimer();
 
-  void _onRecordButtonPressed() {
-    _startVideoRecording().then((String filePath) {
-      if (filePath != null) {
-        Fluttertoast.showToast(
-            msg: 'Recording video started',
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.CENTER,
-            timeInSecForIos: 1,
-            backgroundColor: Colors.grey,
-            textColor: Colors.white
-        );
-      }
-    });
-  }
+    final Directory extDir = await getApplicationDocumentsDirectory();
+    final String dirPath = '${extDir.path}/media';
+    await Directory(dirPath).create(recursive: true);
+    final String filePath = '$dirPath/${_timestamp()}.mp4';
 
-  void _onStopButtonPressed() {
-    _stopVideoRecording().then((_) {
-      if (mounted) setState(() {});
-      Fluttertoast.showToast(
-          msg: 'Video recorded to $videoPath',
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIos: 1,
-          backgroundColor: Colors.grey,
-          textColor: Colors.white
-      );
-    });
-  }
-
-  Future<String> _startVideoRecording() async {
-    if (!controller.value.isInitialized) {
-      Fluttertoast.showToast(
-          msg: 'Please wait',
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIos: 1,
-          backgroundColor: Colors.grey,
-          textColor: Colors.white
-      );
-
+    if (_controller.value.isRecordingVideo) {
+      // A recording is already started, do nothing.
       return null;
     }
-
-    // Do nothing if a recording is on progress
-    if (controller.value.isRecordingVideo) {
-      return null;
-    }
-
-    final Directory appDirectory = await getApplicationDocumentsDirectory();
-    final String videoDirectory = '${appDirectory.path}/Videos';
-    await Directory(videoDirectory).create(recursive: true);
-    final String currentTime = DateTime.now().millisecondsSinceEpoch.toString();
-    final String filePath = '$videoDirectory/${currentTime}.mp4';
 
     try {
-      await controller.startVideoRecording(filePath);
-      videoPath = filePath;
+//      videoPath = filePath;
+      await _controller.startVideoRecording(filePath);
     } on CameraException catch (e) {
       _showCameraException(e);
       return null;
     }
-
     return filePath;
   }
 
-  Future<void> _stopVideoRecording() async {
-    if (!controller.value.isRecordingVideo) {
+  Future<void> stopVideoRecording() async {
+    if (!_controller.value.isRecordingVideo) {
       return null;
     }
+    _timerKey.currentState.stopTimer();
+    setState(() {
+      _isRecording = false;
+    });
 
     try {
-      await controller.stopVideoRecording();
+      await _controller.stopVideoRecording();
     } on CameraException catch (e) {
       _showCameraException(e);
       return null;
     }
   }
 
+  String _timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
+
   void _showCameraException(CameraException e) {
-    String errorText = 'Error: ${e.code}\nError Message: ${e.description}';
-    print(errorText);
-
-    Fluttertoast.showToast(
-        msg: 'Error: ${e.code}\n${e.description}',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.CENTER,
-        timeInSecForIos: 1,
-        backgroundColor: Colors.red,
-        textColor: Colors.white
-    );
+    logError(e.code, e.description);
+    showInSnackBar('Error: ${e.code}\n${e.description}');
   }
-}
 
+  void showInSnackBar(String message) {
+    _scaffoldKey.currentState.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void logError(String code, String message) =>
+      print('Error: $code\nError Message: $message');
+
+  @override
+  bool get wantKeepAlive => true;
+}
