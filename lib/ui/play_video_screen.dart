@@ -32,15 +32,16 @@ class _PlayVideoScreenState extends State<PlayVideoScreen> {
                   aspectRatio: _controller.value.aspectRatio,
                   child: VideoPlayer(_controller),
                 )
-              : Container(),
+              : CircularProgressIndicator(),
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            setState(() {
-              _controller.value.isPlaying
-                  ? _controller.pause()
-                  : _controller.play();
-            });
+            if (_controller.value.initialized)
+              setState(() {
+                _controller.value.isPlaying
+                    ? _controller.pause()
+                    : _controller.play();
+              });
           },
           child: Icon(
             _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
