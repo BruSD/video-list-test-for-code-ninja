@@ -28,7 +28,7 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
         centerTitle: true,
       ),
-      body: _build(context),
+      body: SingleChildScrollView(child: _build(context)),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -66,6 +66,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final videoProvider = Provider.of<VideoProvider>(context);
     if (videoProvider.videoList.length > 0) {
       return ListView.builder(
+        physics: BouncingScrollPhysics(),
         shrinkWrap: true,
         itemCount: videoProvider.videoList.length,
         itemBuilder: (context, position) {
@@ -97,6 +98,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Widget _buildListItem(BuildContext context, int index) {
     final videoProvider = Provider.of<VideoProvider>(context);
+    Size _deviceSize = MediaQuery.of(context).size;
     VideoCN videoCN = videoProvider.videoList[index];
     return InkWell(
       onTap: () {
@@ -114,19 +116,20 @@ class _MyHomePageState extends State<MyHomePage> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              Image.network(
+                videoCN.videoImagePreview,
+                fit: BoxFit.cover,
+                width: _deviceSize.width,
+                height: _deviceSize.width/2,
+              ),
               Container(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-//            Image.network(
-//              product.photos.first,
-//              width: 75,
-//            ),
                     Text(
                       'DocumentID: ' + videoCN.documentID,
                     ),
-
                     Text(
                       'Creating date: ' + videoCN.creationDate.toString(),
                     )
