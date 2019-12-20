@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'package:video_list_test_code_ninja/provider/video-provider.dart';
 import 'package:video_list_test_code_ninja/utils/VideoControls.dart';
 import 'package:video_player/video_player.dart';

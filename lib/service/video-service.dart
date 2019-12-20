@@ -23,4 +23,16 @@ class VideoService {
         await Firestore.instance.collection('video').getDocuments();
     return listOfIngredientsSynonym.documents;
   }
+
+  Future<String> uploadPreview(String thumb) async {
+    final StorageReference storageRef = FirebaseStorage.instance
+        .ref()
+        .child('/preview/' + DateTime.now().toString());
+    final StorageUploadTask uploadTask = storageRef.putFile(File(thumb));
+    final StorageTaskSnapshot downloadUrl = (await uploadTask.onComplete);
+    final String url = (await downloadUrl.ref.getDownloadURL());
+    print('URL Is $url');
+
+    return url;
+  }
 }
